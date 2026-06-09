@@ -1,7 +1,6 @@
 import path from "path";
 import { fileURLToPath } from "url";
-import db from "./util/database.js";
-
+import sequelize from "./util/database.js";
 import express from "express";
 import bodyParser from "body-parser";
 
@@ -9,20 +8,56 @@ import { get404 } from "./controllers/error.js";
 import adminRoutes from "./routes/admin.js";
 import shopRoutes from "./routes/shop.js";
 
+import User from "./models/user.js";
+import Product from "./models/product.js";
+import Cart from "./models/cart.js";
+// import CartItem from "./models/cart-item.js";
+
 const app = express();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(express.static(path.join(__dirname, "public")));
+
 app.set("view engine", "ejs");
 app.set("views", "views");
 
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(express.static(path.join(__dirname, "public")));
+app.use((req, res, next) => {
+  User.findByPk(1)
+    .then((user) => {
+      req.user = user;
+      next();
+    })
+    .catch((err) => console.log(err));
+});
 
 app.use("/admin", adminRoutes);
 app.use(shopRoutes);
 
 app.use(get404);
 
-app.listen(3000);
+User.hasMany(Product);
+Product.belongsTo(User, { constraints: true, onDelete: "CASCADE" });
+
+sequelize
+  // .sync({ force: true })
+  .sync()
+  .then(() => {
+    return User.findByPk(1);
+  })
+  .then((user) => {
+    if (!user) {
+      return User.create({ name: "ahmed", email: "ahmed@example.com" });
+    }
+    return user;
+  })
+  .then(() => {
+    app.listen(3000, () => {
+      console.log("Server is running on port 3000");
+    });
+  })
+  .catch((err) => {
+    console.log(err);
+  });
